@@ -58,7 +58,188 @@ class StudentController extends Controller {
 
     $this->view("student/index", compact('students', 'branches', 'summary', 'filters'));
   }
+ public function enrollment() {
+    $this->requireRole('student');
 
+    $userId = $_SESSION['user_id'];
+
+    $profileStmt = $this->db->prepare("SELECT
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.branch_id AS user_branch_id,
+        sp.branch_id,
+        sp.course_id,
+        sp.start_date,
+        sp.preferred_time,
+        sp.preferred_days,
+        sp.vehicle_type,
+        b.name AS branch_name,
+        c.name AS course_name,
+        c.price AS course_price
+      FROM users u
+      LEFT JOIN student_profiles sp ON sp.user_id = u.id
+      LEFT JOIN branches b ON b.id = COALESCE(sp.branch_id, u.branch_id)
+      LEFT JOIN courses c ON c.id = sp.course_id
+      WHERE u.id = ?");
+    $profileStmt->execute([$userId]);
+    $profile = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $branches = $this->db->query("SELECT id, name FROM branches ORDER BY name")
+      ->fetchAll(PDO::FETCH_ASSOC);
+    $courses = $this->db->query("SELECT id, name, price, class_count, description FROM courses ORDER BY name")
+      ->fetchAll(PDO::FETCH_ASSOC);
+
+    $preferredDays = [];
+    if (!empty($profile['preferred_days'])) {
+      $preferredDays = array_filter(array_map('trim', explode(',', $profile['preferred_days'])));
+    }
+
+    $selectedCourseId = null;
+    if (isset($_GET['course'])) {
+      $selectedCourseId = (int)$_GET['course'];
+    }
+
+    $selectedBranchId = null;
+    if (isset($_GET['branch'])) {
+      $selectedBranchId = (int)$_GET['branch'];
+    }
+
+    $this->view('student/enrollment', [
+      'profile'       => $profile,
+      'branches'      => $branches,
+      'courses'       => $courses,
+      'preferredDays' => $preferredDays,
+      'selectedCourseId' => $selectedCourseId,
+      'selectedBranchId' => $selectedBranchId,
+    ]);
+  }
+
+  public function enroll() {
+    $this->requireRole('student');
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+      $this->redirect('index.php?url=student/enrollment');
+    }
+
+    if (function_exists('csrf_check') && !csrf_check()) {
+      $this->flash('flash_error', 'Security token mismatch. Please try again.');
+      $this->redirect('index.php?url=student/enrollment');
+    }
+
+    $userId = $_SESSION['user_id'];
+
+    $branchId = (int)($_POST['branch_id'] ?? 0);
+    $courseId = (int)($_POST['course_id'] ?? 0);
+    $startDateInput = trim($_POST['start_date'] ?? '');
+    $preferredTime = trim($_POST['preferred_time'] ?? '');
+    $preferredDays = (array)($_POST['preferred_days'] ?? []);
+    $vehicleType = trim($_POST['vehicle_type'] ?? '');
+
+    if ($branchId <= 0 || $courseId <= 0) {
+      $this->flash('flash_error', 'Please choose both a branch and a course.');
+      $this->redirect('index.php?url=student/enrollment');
+    }
+
+    $courseStmt = $this->db->prepare("SELECT id, name, price FROM courses WHERE id = ? LIMIT 1");
+    $courseStmt->execute([$courseId]);
+    $course = $courseStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$course) {
+      $this->flash('flash_error', 'Selected course could not be found.');
+      $this->redirect('index.php?url=student/enrollment');
+    }
+
+    $startDateValue = null;
+    if ($startDateInput !== '') {
+      $startObj = DateTimeImmutable::createFromFormat('Y-m-d', $startDateInput);
+      if (!$startObj) {
+        $this->flash('flash_error', 'Start date must be in YYYY-MM-DD format.');
+        $this->redirect('index.php?url=student/enrollment');
+      }
+      $startDateValue = $startObj->format('Y-m-d');
+    }
+
+    $preferredDaysValue = implode(',', array_map('trim', $preferredDays));
+
+    try {
+      $this->db->beginTransaction();
+
+      $profileCheck = $this->db->prepare('SELECT id FROM student_profiles WHERE user_id = ? LIMIT 1');
+      $profileCheck->execute([$userId]);
+      $profileId = $profileCheck->fetchColumn();
+
+      if ($profileId) {
+        $updateProfile = $this->db->prepare("UPDATE student_profiles
+            SET branch_id = ?, course_id = ?, start_date = ?, preferred_time = ?, preferred_days = ?, vehicle_type = CASE WHEN ? <> '' THEN ? ELSE vehicle_type END, updated_at = NOW()
+          WHERE user_id = ?");
+        $updateProfile->execute([
+          $branchId,
+          $courseId,
+          $startDateValue,
+          $preferredTime,
+          $preferredDaysValue,
+          $vehicleType,
+          $vehicleType,
+          $userId,
+        ]);
+      } else {
+        $insertProfile = $this->db->prepare("INSERT INTO student_profiles
+            (user_id, branch_id, course_id, start_date, preferred_time, preferred_days, vehicle_type, created_at, updated_at)
+          VALUES (?,?,?,?,?,?,?,NOW(),NOW())");
+        $insertProfile->execute([
+          $userId,
+          $branchId,
+          $courseId,
+          $startDateValue,
+          $preferredTime,
+          $preferredDaysValue,
+          $vehicleType !== '' ? $vehicleType : null,
+        ]);
+      }
+
+      $updateUser = $this->db->prepare('UPDATE users SET branch_id = ?, updated_at = NOW() WHERE id = ?');
+      $updateUser->execute([$branchId, $userId]);
+
+      $issueDate = new DateTimeImmutable('today');
+      $dueDate = null;
+      if ($startDateValue) {
+        $dueDate = new DateTimeImmutable($startDateValue);
+      }
+      if (!$dueDate || $dueDate < $issueDate) {
+        $dueDate = $issueDate->modify('+7 days');
+      }
+
+      $invoiceStmt = $this->db->prepare("INSERT INTO invoices (student_id, course_id, amount, issued_date, due_date, status, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,NOW(),NOW())");
+      $invoiceStmt->execute([
+        $userId,
+        $course['id'],
+        $course['price'],
+        $issueDate->format('Y-m-d'),
+        $dueDate->format('Y-m-d'),
+        'pending',
+      ]);
+
+      $this->db->commit();
+    } catch (Exception $e) {
+      $this->db->rollBack();
+      $this->flash('flash_error', 'We could not update your enrolment. Please try again.');
+      $this->redirect('index.php?url=student/enrollment');
+    }
+
+    $_SESSION['branch_id'] = $branchId;
+
+    $branchStmt = $this->db->prepare('SELECT name FROM branches WHERE id = ? LIMIT 1');
+    $branchStmt->execute([$branchId]);
+    $branchName = $branchStmt->fetchColumn();
+    if ($branchName) {
+      $_SESSION['branch_name'] = $branchName;
+    }
+
+    $this->flash('flash_success', 'Your enrolment has been updated and a new invoice was issued.');
+    $this->redirect('index.php?url=student/dashboard');
+  }
   public function profile() {
     $this->requireRole(['student']);
     $userId = $_SESSION['user_id'];

@@ -55,7 +55,7 @@ class ScheduleController extends Controller {
     $branch_id  = $branch_id === '' ? null : $branch_id;
     $vehicle_id = $vehicle_id === '' ? null : $vehicle_id;
 
-    // Conflict check → same student or instructor at overlapping times
+    // Conflict check
     $stmt = $this->db->prepare("
       SELECT * FROM bookings
       WHERE
@@ -127,40 +127,49 @@ class ScheduleController extends Controller {
       $params[':now'] = $now;
     }
 
-    $sql = "SELECT b.*, 
-              CONCAT(stu.first_name, ' ', stu.last_name) AS student_name,
-              CONCAT(inst.first_name, ' ', inst.last_name) AS instructor_name,
-              c.name AS course_name,
-              br.name AS branch_name,
-              v.registration_number AS vehicle_reg
-            FROM bookings b
-            LEFT JOIN users stu ON b.student_id = stu.id
-            LEFT JOIN users inst ON b.instructor_id = inst.id
-            LEFT JOIN courses c ON b.course_id = c.id
-            LEFT JOIN branches br ON b.branch_id = br.id
-            LEFT JOIN vehicles v ON b.vehicle_id = v.id";
-
+    $sql = "SELECT b.*,  
+               CONCAT(stu.first_name, ' ', stu.last_name) AS student_name,
+               CONCAT(inst.first_name, ' ', inst.last_name) AS instructor_name,
+               c.name AS course_name,
+               br.name AS branch_name,
+               v.registration_number AS vehicle_reg
+             FROM bookings b
+             LEFT JOIN users stu ON b.student_id = stu.id
+             LEFT JOIN users inst ON b.instructor_id = inst.id
+             LEFT JOIN courses c ON b.course_id = c.id
+             LEFT JOIN branches br ON b.branch_id = br.id
+             LEFT JOIN vehicles v ON b.vehicle_id = v.id";
+ 
     if ($conditions) {
       $sql .= ' WHERE ' . implode(' AND ', $conditions);
     }
-
+ 
     $sql .= ' ORDER BY b.start_time ASC';
-
+ 
     $stmt = $this->db->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+ 
     // Summary metrics scoped to the viewer
     $scopeWhere = $baseConditions ? (' WHERE ' . implode(' AND ', $baseConditions)) : '';
-
-    $summaryCounts = ['booked' => 0, 'completed' => 0, 'cancelled' => 0];
+ 
+    $summaryCounts = [
+      'booked'    => 0,
+      'scheduled' => 0,
+      'completed' => 0,
+      'cancelled' => 0
+    ];
     $summarySql = "SELECT status, COUNT(*) AS total FROM bookings b" . $scopeWhere . " GROUP BY status";
     $summaryStmt = $this->db->prepare($summarySql);
     $summaryStmt->execute($baseParams);
     foreach ($summaryStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-      $summaryCounts[$row['status']] = (int)$row['total'];
+      $statusKey = strtolower($row['status']);
+      if (!array_key_exists($statusKey, $summaryCounts)) {
+        $summaryCounts[$statusKey] = 0;
+      }
+      $summaryCounts[$statusKey] = (int)$row['total'];
     }
-
+ 
     $upcomingSql = "SELECT COUNT(*) FROM bookings b" .
       ($scopeWhere ? $scopeWhere . " AND b.start_time >= :now" : " WHERE b.start_time >= :now");
     $upcomingStmt = $this->db->prepare($upcomingSql);
@@ -168,34 +177,45 @@ class ScheduleController extends Controller {
     $upcomingParams[':now'] = $now;
     $upcomingStmt->execute($upcomingParams);
     $upcomingCount = (int)$upcomingStmt->fetchColumn();
-
+ 
+    $weekSql = "SELECT COUNT(*) FROM bookings b" .
+      ($scopeWhere ? $scopeWhere . " AND b.start_time BETWEEN :now AND :week_end" : " WHERE b.start_time BETWEEN :now AND :week_end");
+    $weekStmt = $this->db->prepare($weekSql);
+    $weekParams = $baseParams;
+    $weekParams[':now'] = $now;
+    $weekParams[':week_end'] = date('Y-m-d H:i:s', strtotime('+7 days', strtotime($now)));
+    $weekStmt->execute($weekParams);
+    $thisWeekCount = (int)$weekStmt->fetchColumn();
+ 
     $nextSql = "SELECT b.*, 
-                  CONCAT(stu.first_name, ' ', stu.last_name) AS student_name,
-                  CONCAT(inst.first_name, ' ', inst.last_name) AS instructor_name,
-                  c.name AS course_name,
-                  br.name AS branch_name,
-                  v.registration_number AS vehicle_reg
-                FROM bookings b
-                LEFT JOIN users stu ON b.student_id = stu.id
-                LEFT JOIN users inst ON b.instructor_id = inst.id
-                LEFT JOIN courses c ON b.course_id = c.id
-                LEFT JOIN branches br ON b.branch_id = br.id
-                LEFT JOIN vehicles v ON b.vehicle_id = v.id" .
+                   CONCAT(stu.first_name, ' ', stu.last_name) AS student_name,
+                   CONCAT(inst.first_name, ' ', inst.last_name) AS instructor_name,
+                   c.name AS course_name,
+                   br.name AS branch_name,
+                   v.registration_number AS vehicle_reg
+                 FROM bookings b
+                 LEFT JOIN users stu ON b.student_id = stu.id
+                 LEFT JOIN users inst ON b.instructor_id = inst.id
+                 LEFT JOIN courses c ON b.course_id = c.id
+                 LEFT JOIN branches br ON b.branch_id = br.id
+                 LEFT JOIN vehicles v ON b.vehicle_id = v.id" .
       ($scopeWhere ? $scopeWhere . " AND b.start_time >= :now" : " WHERE b.start_time >= :now") .
       " ORDER BY b.start_time ASC LIMIT 1";
     $nextStmt = $this->db->prepare($nextSql);
     $nextStmt->execute($upcomingParams);
     $nextBooking = $nextStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
+ 
     $this->view("schedule/index", [
       'bookings'      => $rows,
       'filters'       => ['status' => $statusFilter, 'window' => $windowFilter],
       'summary'       => [
         'total'     => array_sum($summaryCounts),
         'booked'    => $summaryCounts['booked'],
+        'scheduled' => $summaryCounts['scheduled'],
         'completed' => $summaryCounts['completed'],
         'cancelled' => $summaryCounts['cancelled'],
-        'upcoming'  => $upcomingCount
+        'upcoming'  => $upcomingCount,
+        'this_week' => $thisWeekCount
       ],
       'nextBooking'   => $nextBooking
     ]);
