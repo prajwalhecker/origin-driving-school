@@ -1,6 +1,8 @@
-
-
-<?php if ($_SESSION['role'] === 'admin'): ?>
+<?php
+  @session_start();
+  $currentRole = $_SESSION['role'] ?? null;
+?>
+<?php if ($currentRole === 'admin'): ?>
   <!-- Admin view -->
   <table border="1" cellpadding="8">
     <tr>
