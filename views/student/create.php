@@ -1,4 +1,4 @@
-<?php include __DIR__."/../layouts/header.php"; ?>
+
 <h2 class="mb-2">Create Student</h2>
 <form method="POST" action="index.php?url=student/store" class="form">
   <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
@@ -11,4 +11,3 @@
   </div>
   <div class="actions"><button class="btn success">Create</button></div>
 </form>
-<?php include __DIR__."/../layouts/footer.php"; ?>
