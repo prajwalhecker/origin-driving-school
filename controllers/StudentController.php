@@ -88,9 +88,6 @@ class StudentController extends Controller {
     $this->view("student/profile", compact('student'));
   }
 
-  // ============================
-  // CREATE & STORE
-  // ============================
 
   public function create() {
     $this->requireRole('admin');
@@ -142,8 +139,12 @@ class StudentController extends Controller {
 
     $errors = [];
 
-    if ($firstName === '') $errors[] = 'First name is required.';
-    if ($lastName === '')  $errors[] = 'Last name is required.';
+    if ($firstName === '') {
+      $errors[] = 'First name is required.';
+    }
+    if ($lastName === '') {
+      $errors[] = 'Last name is required.';
+    }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       $errors[] = 'A valid email address is required.';
     }
@@ -204,10 +205,6 @@ class StudentController extends Controller {
     $this->redirect('index.php?url=student/index');
   }
 
-  // ============================
-  // EDIT & UPDATE
-  // ============================
-
   public function edit($id = null) {
     $this->requireRole('admin');
 
@@ -217,13 +214,56 @@ class StudentController extends Controller {
       $this->redirect('index.php?url=student/index');
     }
 
-    $stmt = $this->db->prepare("SELECT id, first_name, last_name, email, phone FROM users WHERE id = ? AND role = 'student'");
+    $stmt = $this->db->prepare("SELECT 
+        u.id,
+        u.branch_id   AS user_branch_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone       AS user_phone,
+        sp.id         AS profile_id,
+        sp.vehicle_type,
+        sp.course_id,
+        sp.branch_id  AS profile_branch_id,
+        sp.address,
+        sp.phone      AS profile_phone,
+        sp.preferred_days,
+        sp.preferred_time,
+        sp.start_date
+      FROM users u
+      LEFT JOIN student_profiles sp ON sp.user_id = u.id
+      WHERE u.id = ? AND u.role = 'student'
+      LIMIT 1");
     $stmt->execute([$id]);
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$student) {
+    if (!$record) {
       $this->flash('flash_error', 'Student not found.');
       $this->redirect('index.php?url=student/index');
+    }
+
+    $student = [
+      'id'         => (int)$record['id'],
+      'first_name' => $record['first_name'],
+      'last_name'  => $record['last_name'],
+      'email'      => $record['email'],
+      'phone'      => $record['user_phone'],
+      'branch_id'  => $record['user_branch_id'],
+    ];
+
+    $profile = null;
+    if (!empty($record['profile_id'])) {
+      $profile = [
+        'id'             => (int)$record['profile_id'],
+        'vehicle_type'   => $record['vehicle_type'],
+        'course_id'      => $record['course_id'],
+        'branch_id'      => $record['profile_branch_id'] ?? $record['user_branch_id'],
+        'address'        => $record['address'],
+        'phone'          => $record['profile_phone'] ?? $record['user_phone'],
+        'preferred_days' => $record['preferred_days'],
+        'preferred_time' => $record['preferred_time'],
+        'start_date'     => $record['start_date'],
+      ];
     }
 
     if (function_exists('session_start_safe')) {
@@ -237,9 +277,19 @@ class StudentController extends Controller {
       clear_old_input();
     }
 
+    $branches = $this->db->query("SELECT id, name FROM branches ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $courses  = $this->db->query("SELECT id, name, price, class_count FROM courses ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $dayOptions = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    $timeOptions = ['Morning','Afternoon','Evening'];
+
     $this->view('student/edit', [
-      'student' => $student,
-      'form'    => $form,
+      'student'     => $student,
+      'profile'     => $profile,
+      'form'        => $form,
+      'branches'    => $branches,
+      'courses'     => $courses,
+      'dayOptions'  => $dayOptions,
+      'timeOptions' => $timeOptions,
     ]);
   }
 
@@ -270,10 +320,22 @@ class StudentController extends Controller {
     $lastName  = trim($_POST['last_name'] ?? '');
     $email     = trim($_POST['email'] ?? '');
     $phone     = trim($_POST['phone'] ?? '');
+    $branchId  = isset($_POST['branch_id']) ? (int)$_POST['branch_id'] : 0;
+    $vehicle   = strtolower(trim($_POST['vehicle_type'] ?? ''));
+    $courseId  = isset($_POST['course_id']) ? (int)$_POST['course_id'] : 0;
+    $address   = trim($_POST['address'] ?? '');
+    $startDate = trim($_POST['start_date'] ?? '');
+    $preferredTime = trim($_POST['preferred_time'] ?? '');
+    $preferredDaysInput = $_POST['preferred_days'] ?? [];
 
     $errors = [];
-    if ($firstName === '') $errors[] = 'First name is required.';
-    if ($lastName === '')  $errors[] = 'Last name is required.';
+
+    if ($firstName === '') {
+      $errors[] = 'First name is required.';
+    }
+    if ($lastName === '') {
+      $errors[] = 'Last name is required.';
+    }
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       $errors[] = 'A valid email address is required.';
     }
@@ -282,6 +344,58 @@ class StudentController extends Controller {
     $stmt->execute([$email, $id]);
     if ($stmt->fetch(PDO::FETCH_ASSOC)) {
       $errors[] = 'Email address is already in use.';
+    }
+
+    if ($branchId <= 0) {
+      $errors[] = 'Please select a branch.';
+    } else {
+      $branchCheck = $this->db->prepare("SELECT id FROM branches WHERE id = ? LIMIT 1");
+      $branchCheck->execute([$branchId]);
+      if (!$branchCheck->fetch(PDO::FETCH_ASSOC)) {
+        $errors[] = 'Selected branch does not exist.';
+      }
+    }
+
+    $allowedVehicles = ['car','motorcycle'];
+    if ($vehicle === '' || !in_array($vehicle, $allowedVehicles, true)) {
+      $errors[] = 'Please choose a valid vehicle type.';
+    }
+
+    if ($courseId <= 0) {
+      $errors[] = 'Please select a course.';
+    } else {
+      $courseCheck = $this->db->prepare("SELECT id FROM courses WHERE id = ? LIMIT 1");
+      $courseCheck->execute([$courseId]);
+      if (!$courseCheck->fetch(PDO::FETCH_ASSOC)) {
+        $errors[] = 'Selected course does not exist.';
+      }
+    }
+
+    $allowedDays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    $preferredDays = [];
+    if (is_array($preferredDaysInput)) {
+      foreach ($preferredDaysInput as $day) {
+        $day = trim((string)$day);
+        if (in_array($day, $allowedDays, true) && !in_array($day, $preferredDays, true)) {
+          $preferredDays[] = $day;
+        }
+      }
+    }
+    $preferredDaysString = implode(',', $preferredDays);
+
+    $allowedTimes = ['', 'Morning', 'Afternoon', 'Evening'];
+    if (!in_array($preferredTime, $allowedTimes, true)) {
+      $errors[] = 'Please choose a valid preferred time.';
+    }
+
+    $startDateValue = null;
+    if ($startDate !== '') {
+      $dateObj = DateTime::createFromFormat('Y-m-d', $startDate);
+      if (!$dateObj) {
+        $errors[] = 'Start date must be in YYYY-MM-DD format.';
+      } else {
+        $startDateValue = $dateObj->format('Y-m-d');
+      }
     }
 
     if (!empty($errors)) {
@@ -294,16 +408,61 @@ class StudentController extends Controller {
 
     $update = $this->db->prepare(
       "UPDATE users
-       SET first_name = ?, last_name = ?, email = ?, phone = ?, updated_at = NOW()
+       SET branch_id = ?, first_name = ?, last_name = ?, email = ?, phone = ?, updated_at = NOW()
        WHERE id = ? AND role = 'student'"
     );
     $update->execute([
+      $branchId,
       $firstName,
       $lastName,
       $email,
       $phone !== '' ? $phone : null,
       $id,
     ]);
+
+    $profileStmt = $this->db->prepare("SELECT id FROM student_profiles WHERE user_id = ? LIMIT 1");
+    $profileStmt->execute([$id]);
+    $profile = $profileStmt->fetch(PDO::FETCH_ASSOC);
+
+    $profilePhone = $phone !== '' ? $phone : null;
+    $preferredTimeValue = $preferredTime !== '' ? $preferredTime : null;
+    $addressValue = $address !== '' ? $address : null;
+
+    if ($profile) {
+      $profileUpdate = $this->db->prepare(
+        "UPDATE student_profiles
+         SET vehicle_type = ?, course_id = ?, branch_id = ?, address = ?, phone = ?, preferred_days = ?, preferred_time = ?, start_date = ?, updated_at = NOW()
+         WHERE user_id = ?"
+      );
+      $profileUpdate->execute([
+        $vehicle,
+        $courseId,
+        $branchId,
+        $addressValue,
+        $profilePhone,
+        $preferredDaysString !== '' ? $preferredDaysString : null,
+        $preferredTimeValue,
+        $startDateValue,
+        $id,
+      ]);
+    } else {
+      $profileInsert = $this->db->prepare(
+        "INSERT INTO student_profiles
+          (user_id, vehicle_type, course_id, branch_id, address, phone, preferred_days, preferred_time, start_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+      );
+      $profileInsert->execute([
+        $id,
+        $vehicle,
+        $courseId,
+        $branchId,
+        $addressValue,
+        $profilePhone,
+        $preferredDaysString !== '' ? $preferredDaysString : null,
+        $preferredTimeValue,
+        $startDateValue,
+      ]);
+    }
 
     if (function_exists('clear_old_input')) {
       clear_old_input();
@@ -312,10 +471,6 @@ class StudentController extends Controller {
     $this->flash('flash_success', 'Student details updated.');
     $this->redirect('index.php?url=student/index');
   }
-
-  // ============================
-  // SHOW
-  // ============================
 
   public function show($id = null) {
     $this->requireRole('admin');
@@ -326,16 +481,65 @@ class StudentController extends Controller {
       $this->redirect('index.php?url=student/index');
     }
 
-    $stmt = $this->db->prepare("SELECT id, first_name, last_name, email, phone FROM users WHERE id = ? AND role = 'student'");
+    $stmt = $this->db->prepare("SELECT
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone       AS user_phone,
+        u.branch_id   AS user_branch_id,
+        bu.name       AS user_branch_name,
+        sp.vehicle_type,
+        sp.course_id,
+        sp.branch_id  AS profile_branch_id,
+        sp.address,
+        sp.phone      AS profile_phone,
+        sp.preferred_days,
+        sp.preferred_time,
+        sp.start_date,
+        bp.name       AS profile_branch_name,
+        c.name        AS course_name
+      FROM users u
+      LEFT JOIN student_profiles sp ON sp.user_id = u.id
+      LEFT JOIN branches bu ON bu.id = u.branch_id
+      LEFT JOIN branches bp ON bp.id = sp.branch_id
+      LEFT JOIN courses c ON c.id = sp.course_id
+      WHERE u.id = ? AND u.role = 'student'
+      LIMIT 1");
     $stmt->execute([$id]);
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$student) {
+    if (!$record) {
       $this->flash('flash_error', 'Student not found.');
       $this->redirect('index.php?url=student/index');
     }
 
-    $this->view('student/show', compact('student'));
-  }
+    $student = [
+      'id'        => (int)$record['id'],
+      'first_name'=> $record['first_name'],
+      'last_name' => $record['last_name'],
+      'email'     => $record['email'],
+      'phone'     => $record['user_phone'],
+      'branch'    => $record['profile_branch_name'] ?? $record['user_branch_name'],
+    ];
 
+    $profile = null;
+    if (!empty($record['course_id']) || !empty($record['vehicle_type']) || !empty($record['profile_branch_id'])) {
+      $profile = [
+        'vehicle_type'   => $record['vehicle_type'],
+        'course_name'    => $record['course_name'],
+        'branch_name'    => $record['profile_branch_name'] ?? $record['user_branch_name'],
+        'address'        => $record['address'],
+        'phone'          => $record['profile_phone'] ?? $record['user_phone'],
+        'preferred_days' => $record['preferred_days'],
+        'preferred_time' => $record['preferred_time'],
+        'start_date'     => $record['start_date'],
+      ];
+    }
+
+    $this->view('student/show', [
+      'student' => $student,
+      'profile' => $profile,
+    ]);
+  }
 }
