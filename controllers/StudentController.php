@@ -240,33 +240,181 @@ class StudentController extends Controller {
     $this->flash('flash_success', 'Your enrolment has been updated and a new invoice was issued.');
     $this->redirect('index.php?url=student/dashboard');
   }
+
   public function profile() {
-    $this->requireRole(['student']);
+    $this->requireRole('student');
+    @session_start();
+
     $userId = $_SESSION['user_id'];
 
-    $stmt = $this->db->prepare("
-      SELECT 
-          u.first_name,
-          u.last_name,
-          u.email,
-          u.phone,
-          s.address,
-          s.vehicle_type,
-          c.name AS course
+    $profileStmt = $this->db->prepare("SELECT
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone AS user_phone,
+        u.created_at AS enrolled_at,
+        u.branch_id AS user_branch_id,
+        sp.phone AS profile_phone,
+        sp.address,
+        sp.vehicle_type,
+        sp.preferred_days,
+        sp.preferred_time,
+        sp.start_date,
+        sp.course_id,
+        sp.branch_id AS profile_branch_id,
+        stu.licence_type,
+        COALESCE(sp.branch_id, u.branch_id) AS resolved_branch_id,
+        b.name AS branch_name,
+        b.phone AS branch_phone,
+        b.address AS branch_address,
+        c.name AS course_name,
+        c.price AS course_price,
+        c.class_count AS course_classes,
+        c.description AS course_description
       FROM users u
-      LEFT JOIN student_profiles s ON u.id = s.user_id
-      LEFT JOIN courses c ON s.course_id = c.id
+      LEFT JOIN student_profiles sp ON sp.user_id = u.id
+      LEFT JOIN students stu ON stu.user_id = u.id
+      LEFT JOIN branches b ON b.id = COALESCE(sp.branch_id, u.branch_id)
+      LEFT JOIN courses c ON c.id = sp.course_id
       WHERE u.id = ?
-    ");
-    $stmt->execute([$userId]);
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+      LIMIT 1");
+    $profileStmt->execute([$userId]);
+    $row = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-    if (!$student) {
-      $this->flash('flash_error','Profile not found.');
-      $this->redirect('index.php?url=dashboard');
+    if (empty($row)) {
+      $this->flash('flash_error', 'Profile not found.');
+      $this->redirect('index.php?url=student/dashboard');
+      return;
     }
 
-    $this->view("student/profile", compact('student'));
+    $preferredDaysList = [];
+    if (!empty($row['preferred_days'])) {
+      $preferredDaysList = array_filter(array_map('trim', explode(',', $row['preferred_days'])));
+    }
+
+    $profile = [];
+    if (!empty($row)) {
+      $profile = [
+        'first_name'           => $row['first_name'] ?? null,
+        'last_name'            => $row['last_name'] ?? null,
+        'email'                => $row['email'] ?? null,
+        'phone'                => $row['profile_phone'] ?? $row['user_phone'] ?? null,
+        'address'              => $row['address'] ?? null,
+        'vehicle_type'         => $row['vehicle_type'] ?? null,
+        'licence_type'         => $row['licence_type'] ?? null,
+        'start_date'           => $row['start_date'] ?? null,
+        'preferred_time'       => $row['preferred_time'] ?? null,
+        'preferred_days'       => $row['preferred_days'] ?? null,
+        'preferred_days_list'  => $preferredDaysList,
+        'enrolled_at'          => $row['enrolled_at'] ?? null,
+        'course_id'            => $row['course_id'] ?? null,
+        'course_name'          => $row['course_name'] ?? null,
+        'course_price'         => $row['course_price'] ?? null,
+        'course_classes'       => $row['course_classes'] ?? null,
+        'course_description'   => $row['course_description'] ?? null,
+        'branch_id'            => $row['resolved_branch_id'] ?? $row['profile_branch_id'] ?? $row['user_branch_id'] ?? null,
+        'branch_name'          => $row['branch_name'] ?? null,
+        'branch_phone'         => $row['branch_phone'] ?? null,
+        'branch_address'       => $row['branch_address'] ?? null,
+      ];
+    }
+
+    if (!empty($profile['first_name']) || !empty($profile['last_name'])) {
+      $_SESSION['student_name'] = trim(($profile['first_name'] ?? '') . ' ' . ($profile['last_name'] ?? ''));
+    }
+
+    if (!empty($profile['branch_id'])) {
+      $_SESSION['branch_id'] = (int)$profile['branch_id'];
+      if (!empty($profile['branch_name'])) {
+        $_SESSION['branch_name'] = $profile['branch_name'];
+      }
+    }
+
+    $now = date('Y-m-d H:i:s');
+
+    $countStmt = $this->db->prepare("SELECT status, COUNT(*) AS total FROM bookings WHERE student_id = ? GROUP BY status");
+    $countStmt->execute([$userId]);
+    $statusCounts = [
+      'booked'    => 0,
+      'scheduled' => 0,
+      'completed' => 0,
+      'cancelled' => 0,
+    ];
+    foreach ($countStmt->fetchAll(PDO::FETCH_ASSOC) as $countRow) {
+      $key = strtolower($countRow['status']);
+      if (!isset($statusCounts[$key])) {
+        $statusCounts[$key] = 0;
+      }
+      $statusCounts[$key] = (int)$countRow['total'];
+    }
+
+    $upcomingStmt = $this->db->prepare("SELECT COUNT(*) FROM bookings WHERE student_id = ? AND start_time >= ?");
+    $upcomingStmt->execute([$userId, $now]);
+    $upcomingCount = (int)$upcomingStmt->fetchColumn();
+
+    $lessonStats = [
+      'upcoming'  => $upcomingCount,
+      'completed' => $statusCounts['completed'],
+      'cancelled' => $statusCounts['cancelled'],
+    ];
+
+    $bookingSelect = "SELECT b.id, b.start_time, b.end_time, b.status,
+        CONCAT(inst.first_name, ' ', inst.last_name) AS instructor_name,
+        c.name AS course_name,
+        br.name AS branch_name
+      FROM bookings b
+      LEFT JOIN users inst ON inst.id = b.instructor_id
+      LEFT JOIN courses c ON c.id = b.course_id
+      LEFT JOIN branches br ON br.id = b.branch_id
+      WHERE b.student_id = ?";
+
+    $nextStmt = $this->db->prepare($bookingSelect . " AND b.start_time >= ? ORDER BY b.start_time ASC LIMIT 1");
+    $nextStmt->execute([$userId, $now]);
+    $nextLesson = $nextStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    $lastStmt = $this->db->prepare($bookingSelect . " AND b.start_time < ? ORDER BY b.start_time DESC LIMIT 1");
+    $lastStmt->execute([$userId, $now]);
+    $lastLesson = $lastStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    $recentStmt = $this->db->prepare($bookingSelect . " ORDER BY b.start_time DESC LIMIT 10");
+    $recentStmt->execute([$userId]);
+    $recentLessons = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $invoiceStmt = $this->db->prepare("SELECT i.*, c.name AS course_name,
+        (SELECT COALESCE(SUM(amount), 0) FROM payments p WHERE p.invoice_id = i.id) AS paid_total
+      FROM invoices i
+      LEFT JOIN courses c ON c.id = i.course_id
+      WHERE i.student_id = ?
+      ORDER BY i.issued_date DESC, i.created_at DESC");
+    $invoiceStmt->execute([$userId]);
+    $invoices = $invoiceStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $invoiceSummary = [
+      'total_invoices'   => count($invoices),
+      'outstanding_total' => 0.0,
+      'settled_total'     => 0.0,
+    ];
+
+    foreach ($invoices as &$invoice) {
+      $amount = (float)($invoice['amount'] ?? 0);
+      $paid = (float)($invoice['paid_total'] ?? 0);
+      $invoice['balance'] = max($amount - $paid, 0);
+      $invoiceSummary['outstanding_total'] += $invoice['balance'];
+      $invoiceSummary['settled_total'] += min($paid, $amount);
+    }
+    unset($invoice);
+
+    $latestInvoice = $invoices[0] ?? null;
+
+    $this->view('student/profile', [
+      'profile'        => $profile,
+      'lessonStats'    => $lessonStats,
+      'nextLesson'     => $nextLesson,
+      'lastLesson'     => $lastLesson,
+      'recentLessons'  => $recentLessons,
+      'invoiceSummary' => $invoiceSummary,
+      'latestInvoice'  => $latestInvoice,
+    ]);
   }
 
 
@@ -395,7 +543,7 @@ class StudentController extends Controller {
       $this->redirect('index.php?url=student/index');
     }
 
-    $stmt = $this->db->prepare("SELECT 
+    $stmt = $this->db->prepare("SELECT
         u.id,
         u.branch_id   AS user_branch_id,
         u.first_name,

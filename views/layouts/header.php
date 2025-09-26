@@ -10,7 +10,7 @@
 <div class="topbar">
   <div class="inner">
     <div class="brand">
-      <a href="index.php?url=home/index" style="color:#fff;text-decoration:none;">Origin Driving School</a>
+      <a href="index.php?url=dashboard/index" style="color:#fff;text-decoration:none;">Origin Driving School</a>
     </div>
     <div class="nav">
       <?php if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'instructor')): ?>

@@ -19,10 +19,15 @@ class AuthController extends Controller {
 
       if ($user && password_verify($pass, $user['password'])) {
         @session_start();
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['role']    = $user['role'];
-        $_SESSION['student_name'] = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+        $_SESSION['user_id']    = $user['id'];
+        $_SESSION['role']       = $user['role'];
 
+        // ✅ Set full name info in session
+        $_SESSION['first_name'] = $user['first_name'] ?? '';
+        $_SESSION['last_name']  = $user['last_name'] ?? '';
+        $_SESSION['student_name'] = trim(($_SESSION['first_name']) . ' ' . ($_SESSION['last_name']));
+
+        // Branch lookup
         $branchId = $user['branch_id'] ?? null;
         $branchName = null;
         if ($branchId) {
@@ -45,18 +50,20 @@ class AuthController extends Controller {
         if ($branchName) {
           $_SESSION['branch_name'] = $branchName;
         }
-        $this->flash('flash_success', "Welcome back!");
 
-        if ($user['role'] === 'admin')       $this->redirect("index.php?url=dashboard/admin");
-        if ($user['role'] === 'instructor')  $this->redirect("index.php?url=instructor/dashboard");
-        $this->redirect("index.php?url=student/dashboard");
+        $this->flash('flash_success', "Welcome back, " . $_SESSION['student_name'] . "!");
+        $this->redirect("index.php?url=dashboard/index");
       }
 
+      // login failed
       $this->flash('flash_error', "Invalid email/phone or password.");
-      return $this->view("auth/login");
+      return $this->view("auth/login", [
+        'flash_error'   => $this->takeFlash('flash_error'),
+        'flash_success' => $this->takeFlash('flash_success')
+      ]);
     }
 
-    // GET request → just show login view
+    // GET request → show login form
     $this->view("auth/login", [
       'flash_error'   => $this->takeFlash('flash_error'),
       'flash_success' => $this->takeFlash('flash_success')
@@ -68,22 +75,22 @@ class AuthController extends Controller {
    */
   public function register() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-      $email = trim($_POST['email'] ?? '');
-      $fn = trim($_POST['first_name'] ?? '');
-      $ln = trim($_POST['last_name'] ?? '');
-      $phone = trim($_POST['phone'] ?? '');
-      $pass = $_POST['password'] ?? '';
-      $role = 'student';
+      $email  = trim($_POST['email'] ?? '');
+      $fn     = trim($_POST['first_name'] ?? '');
+      $ln     = trim($_POST['last_name'] ?? '');
+      $phone  = trim($_POST['phone'] ?? '');
+      $pass   = $_POST['password'] ?? '';
+      $role   = 'student';
 
-      $branch_id = $_POST['branch_id'] ?? null;
-      $vehicle_type = $_POST['vehicle_type'] ?? null;
-      $course_id = $_POST['course_id'] ?? null;
-      $address = trim($_POST['address'] ?? '');
+      $branch_id      = $_POST['branch_id'] ?? null;
+      $vehicle_type   = $_POST['vehicle_type'] ?? null;
+      $course_id      = $_POST['course_id'] ?? null;
+      $address        = trim($_POST['address'] ?? '');
       $preferred_days = $_POST['preferred_days'] ?? null;
       $preferred_time = $_POST['preferred_time'] ?? null;
-      $start_date = $_POST['start_date'] ?? null;
+      $start_date     = $_POST['start_date'] ?? null;
 
-      // Fix: convert arrays to strings
+      // Convert arrays to strings
       if (is_array($course_id)) {
         $course_id = implode(',', $course_id);
       }
@@ -94,7 +101,7 @@ class AuthController extends Controller {
         $preferred_time = implode(',', $preferred_time);
       }
 
-      // Duplicate email?
+      // Duplicate email check
       $stmt = $this->db->prepare("SELECT id FROM users WHERE email=?");
       $stmt->execute([$email]);
       if ($stmt->fetch()) {
@@ -108,7 +115,6 @@ class AuthController extends Controller {
         (branch_id, created_at, email, first_name, last_name, password, phone, role, updated_at)
         VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, NOW())");
       $stmt->execute([$branch_id, $email, $fn, $ln, $hash, $phone, $role]);
-
       $user_id = (int)$this->db->lastInsertId();
 
       // Create student profile
@@ -117,7 +123,7 @@ class AuthController extends Controller {
         VALUES (?,?,?,?,?,?,?,?,?)");
       $stmt->execute([$user_id, $vehicle_type, $course_id, $branch_id, $address, $phone, $preferred_days, $preferred_time, $start_date]);
 
-      // Automatically generate an invoice for the chosen course so the student portal stays in sync
+      // Generate invoice for chosen course
       $courseStmt = $this->db->prepare("SELECT id, price FROM courses WHERE id=? LIMIT 1");
       $courseStmt->execute([$course_id]);
       $course = $courseStmt->fetch(PDO::FETCH_ASSOC);
@@ -153,7 +159,7 @@ class AuthController extends Controller {
       $this->redirect("index.php?url=auth/login");
     }
 
-    // GET → show form with branches & courses
+    // GET request → show form
     $this->view("auth/register", $this->registrationData());
   }
 
@@ -162,8 +168,8 @@ class AuthController extends Controller {
     $branches = $this->db->query("SELECT id, name FROM branches ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
     $courses  = $this->db->query("SELECT id, name, price, class_count FROM courses ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
     return [
-      'branches' => $branches,
-      'courses'  => $courses,
+      'branches'      => $branches,
+      'courses'       => $courses,
       'flash_error'   => $this->takeFlash('flash_error'),
       'flash_success' => $this->takeFlash('flash_success')
     ];
