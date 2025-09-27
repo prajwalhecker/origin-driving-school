@@ -7,7 +7,7 @@
   <a class="btn outline" href="index.php?url=instructor/index">Back to instructors</a>
 </div>
 
-<form method="POST" action="index.php?url=instructor/store" class="form">
+<form method="POST" action="index.php?url=instructor/store" class="form" enctype="multipart/form-data">
   <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
   <div class="row">
     <div class="field">
@@ -29,6 +29,18 @@
     <div class="field">
       <label for="password">Password (optional)</label>
       <input id="password" type="password" name="password">
+    </div>
+    <div class="field">
+      <label for="address">Address</label>
+      <input id="address" name="address" placeholder="Street, Suburb, City">
+    </div>
+    <div class="field">
+      <label for="experience">Experience</label>
+      <textarea id="experience" name="experience" rows="3" placeholder="e.g. 5 years teaching experience, defensive driving specialist"></textarea>
+    </div>
+    <div class="field">
+      <label for="photo">Profile photo</label>
+      <input id="photo" type="file" name="photo" accept="image/*">
     </div>
   </div>
   <div class="actions">

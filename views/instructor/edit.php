@@ -1,4 +1,3 @@
-<?php include __DIR__."/../layouts/header.php"; ?>
 <h2 class="mb-2">Edit Instructor</h2>
 <form method="POST" action="index.php?url=instructor/update/<?= (int)$instructor['id'] ?>" class="form">
   <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
@@ -10,4 +9,3 @@
   </div>
   <div class="actions"><button class="btn primary">Save</button></div>
 </form>
-<?php include __DIR__."/../layouts/footer.php"; ?>

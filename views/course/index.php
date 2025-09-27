@@ -36,9 +36,68 @@ if ($isAdmin || $isInstructor) {
 
 <?php if ($isAdmin): ?>
   <div class="breadcrumb">Operations / Courses</div>
-  <div class="mb-3" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-    <!-- admin content continues here -->
+  <div class="mb-3" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 class="mb-1">Course Management</h1>
+      <p class="muted mb-0">Create, edit, and monitor courses offered at your driving school.</p>
+    </div>
+    <a class="btn primary" href="index.php?url=course/create">+ Add Course</a>
   </div>
+
+  <?php if (empty($courses)): ?>
+    <div class="card empty-state-card">
+      <h3 class="mb-1">No courses yet</h3>
+      <p class="muted mb-0">Click “Add Course” to create your first programme.</p>
+    </div>
+  <?php else: ?>
+    <div class="cards mb-3">
+      <div class="card">
+        <h4 class="mb-1">Total Courses</h4>
+        <div style="font-size:1.6rem;font-weight:700;"><?= $totalCourses; ?></div>
+        <p class="muted mb-0">Programmes available</p>
+      </div>
+      <div class="card">
+        <h4 class="mb-1">Total Classes</h4>
+        <div style="font-size:1.6rem;font-weight:700; color:#0b6b33;"><?= $totalClasses; ?></div>
+        <p class="muted mb-0">Across all programmes</p>
+      </div>
+      <div class="card">
+        <h4 class="mb-1">Average Price</h4>
+        <div style="font-size:1.6rem;font-weight:700; color:#842029;">
+          <?= $avgPrice ? '$' . number_format($avgPrice, 2) : '—'; ?>
+        </div>
+        <p class="muted mb-0">Per course</p>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Price</th>
+            <th>Classes</th>
+            <th class="right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($courses as $course): ?>
+            <tr>
+              <td><?= htmlspecialchars($course['name']); ?></td>
+              <td><?= htmlspecialchars($course['description']); ?></td>
+              <td>$<?= number_format((float)$course['price'], 2); ?></td>
+              <td><?= (int)$course['class_count']; ?></td>
+              <td class="right">
+                <a class="btn small outline" href="index.php?url=course/edit/<?= (int)$course['id']; ?>">Edit</a>
+                <a class="btn small danger" href="index.php?url=course/destroy/<?= (int)$course['id']; ?>" onclick="return confirm('Delete this course?');">Delete</a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
 
 <?php elseif ($isInstructor): ?>
   <div class="mb-3">

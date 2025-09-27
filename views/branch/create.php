@@ -12,15 +12,15 @@
   <div class="row">
     <div class="field">
       <label for="name">Name</label>
-      <input id="name" name="name" required>
+      <input id="name" name="name" required autocomplete="organization">
     </div>
     <div class="field">
       <label for="phone">Phone</label>
-      <input id="phone" name="phone">
+      <input id="phone" name="phone" autocomplete="tel">
     </div>
     <div class="field" style="grid-column: 1 / -1;">
       <label for="address">Address</label>
-      <input id="address" name="address" required>
+      <input id="address" name="address" required autocomplete="street-address" placeholder="e.g. 16 King St, Sydney NSW">
     </div>
   </div>
   <div class="actions">

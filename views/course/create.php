@@ -14,15 +14,23 @@
       <label for="name">Name</label>
       <input id="name" name="name" required>
     </div>
+
     <div class="field" style="grid-column: 1 / -1;">
       <label for="description">Description</label>
       <textarea id="description" name="description" rows="4"></textarea>
     </div>
+
     <div class="field">
       <label for="price">Price</label>
       <input id="price" type="number" step="0.01" name="price" required>
     </div>
+
+    <div class="field">
+      <label for="class_count">Classes</label>
+      <input id="class_count" type="number" name="class_count" min="1" required>
+    </div>
   </div>
+
   <div class="actions">
     <button class="btn success" type="submit">Save course</button>
     <a class="btn outline" href="index.php?url=course/index">Cancel</a>

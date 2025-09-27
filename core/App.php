@@ -7,10 +7,13 @@ class App {
   }
 
   private function parseUrl(): array {
-    if (!isset($_GET['url']) || $_GET['url'] === '') {
+    $raw = $_GET['url'] ?? $_POST['url'] ?? '';
+
+    if ($raw === '') {
       return ['home', 'index']; // controller HomeController (optional), method index
     }
-    $u = rtrim($_GET['url'], '/');
+
+    $u = rtrim($raw, '/');
     $u = filter_var($u, FILTER_SANITIZE_URL);
     return explode('/', $u);
   }

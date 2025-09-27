@@ -36,6 +36,7 @@ if ($isAdmin) {
 ?>
 
 <?php if ($isAdmin): ?>
+  <!-- Admin View -->
   <div class="breadcrumb">Team / Instructors</div>
   <div class="mb-3" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
     <div>
@@ -72,8 +73,9 @@ if ($isAdmin) {
       <div class="card">
         <h4 class="mb-1">Newest addition</h4>
         <?php if ($recentHire): ?>
+          <?php $recentName = $recentHire['full_name'] ?? $recentHire['name'] ?? '—'; ?>
           <div style="font-size:1.05rem;font-weight:600;">
-            <?= htmlspecialchars($recentHire['name'] ?? '—'); ?>
+            <?= htmlspecialchars($recentName); ?>
           </div>
           <p class="muted mb-0">
             <?= $recentHireDate ? 'Joined ' . htmlspecialchars($recentHireDate) : 'Recently added to your roster'; ?>
@@ -116,8 +118,9 @@ if ($isAdmin) {
             $photoFile = $inst['photo'] ?? 'default.png';
             $hasPhoto = !empty($inst['photo']);
             $photoPath = 'uploads/instructors/' . ($photoFile !== '' ? $photoFile : 'default.png');
+            $displayName = $inst['full_name'] ?? $inst['name'] ?? 'Unnamed';
             $searchIndex = strtolower(trim(implode(' ', array_filter([
-              $inst['name'] ?? '',
+              $displayName,
               $inst['experience'] ?? '',
               $inst['address'] ?? '',
               $inst['phone'] ?? '',
@@ -132,9 +135,9 @@ if ($isAdmin) {
               data-search="<?= htmlspecialchars($searchIndex); ?>">
             <td>
               <div class="stack">
-                <img class="avatar" src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($inst['name'] ?? 'Instructor'); ?>">
+                <img class="avatar" src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($displayName); ?>">
                 <div class="stacked">
-                  <strong><?= htmlspecialchars($inst['name'] ?? 'Unnamed'); ?></strong>
+                  <strong><?= htmlspecialchars($displayName); ?></strong>
                   <?php if ($createdLabel): ?>
                     <span class="muted text-sm"><?= htmlspecialchars($createdLabel); ?></span>
                   <?php endif; ?>
@@ -224,8 +227,9 @@ if ($isAdmin) {
         applyFilters();
       })();
     </script>
-  <?php endif; ?>
+  <?php endif; ?> <!-- end $totalInstructors -->
 <?php else: ?>
+  <!-- Public View -->
   <div class="mb-3">
     <h1 class="mb-1">Meet our instructors</h1>
     <p class="muted mb-0">Experienced professionals ready to guide you safely onto the road.</p>
@@ -242,10 +246,11 @@ if ($isAdmin) {
         <?php
           $photoFile = $inst['photo'] ?? 'default.png';
           $photoPath = 'assets/images/' . ($photoFile !== '' ? $photoFile : 'default.png');
+          $displayName = $inst['full_name'] ?? $inst['name'] ?? 'Instructor';
         ?>
         <div class="card instructor-card">
-          <img src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($inst['name'] ?? 'Instructor'); ?>" class="instructor-photo">
-          <div class="name"><?= htmlspecialchars($inst['name'] ?? 'Instructor'); ?></div>
+          <img src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($displayName); ?>" class="instructor-photo">
+          <div class="name"><?= htmlspecialchars($displayName); ?></div>
           <?php if (!empty($inst['experience'])): ?>
             <div class="meta"><?= htmlspecialchars($inst['experience']); ?></div>
           <?php endif; ?>
@@ -256,4 +261,4 @@ if ($isAdmin) {
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
-<?php endif; ?>
+<?php endif; ?> <!-- end $isAdmin -->

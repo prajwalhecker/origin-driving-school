@@ -12,12 +12,13 @@ $statusBadge = function(array $invoice): string {
   $status = strtolower($invoice['status'] ?? 'pending');
   $classes = [
     'paid'     => 'badge green',
+    'unpaid'   => 'badge yellow',
     'pending'  => 'badge yellow',
     'partial'  => 'badge gray',
   ];
   $class = $classes[$status] ?? 'badge gray';
 
-  if (!empty($invoice['is_overdue'])) {
+  if (!empty($invoice['is_overdue']) && $status !== 'paid') {
     $class = 'badge red';
   }
 
@@ -43,9 +44,12 @@ $dueLabel = function(array $invoice): string {
     <h1 class="mb-1">Invoices</h1>
     <p class="muted mb-0">Issue, track, and reconcile student invoices from a single workspace.</p>
   </div>
-  <?php if (!$isStudent): ?>
-    <a class="btn primary" href="index.php?url=invoice/create">+ New invoice</a>
-  <?php endif; ?>
+  <div style="display:flex; gap:10px;">
+    <?php if (!$isStudent): ?>
+      <a class="btn primary" href="index.php?url=invoice/create">+ New invoice</a>
+      <a class="btn success" href="index.php?url=invoice/exportCsv">⬇ Download CSV</a>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="cards mb-3">
@@ -102,7 +106,7 @@ $dueLabel = function(array $invoice): string {
       </thead>
       <tbody>
       <?php foreach ($invoices as $invoice): ?>
-        <tr<?php if (!empty($invoice['is_overdue'])): ?> style="background:#fff5f5;"<?php endif; ?>>
+        <tr<?php if (!empty($invoice['is_overdue']) && $invoice['status'] !== 'paid'): ?> style="background:#fff5f5;"<?php endif; ?>>
           <td>#<?= (int)$invoice['id']; ?></td>
           <?php if (!$isStudent): ?>
             <td>
@@ -118,8 +122,22 @@ $dueLabel = function(array $invoice): string {
           <td><?= $statusBadge($invoice); ?></td>
           <td class="right">
             <a class="btn small outline" href="index.php?url=invoice/show/<?= (int)$invoice['id']; ?>">View</a>
-            <?php if (!$isStudent): ?>
-              <a class="btn small danger" href="index.php?url=invoice/destroy/<?= (int)$invoice['id']; ?>" onclick="return confirm('Delete this invoice? Payments will also be removed.');">Delete</a>
+
+            <?php if ($isStudent): ?>
+              <a class="btn small success" href="index.php?url=invoice/download/<?= (int)$invoice['id']; ?>">⬇ Download</a>
+            <?php else: ?>
+              <?php if ($invoice['status'] !== 'paid'): ?>
+                <a class="btn small success" 
+                   href="index.php?url=invoice/markPaid/<?= (int)$invoice['id']; ?>"
+                   onclick="return confirm('Confirm cash payment for this invoice?');">
+                   Mark as Paid
+                </a>
+              <?php endif; ?>
+              <a class="btn small danger" 
+                 href="index.php?url=invoice/destroy/<?= (int)$invoice['id']; ?>" 
+                 onclick="return confirm('Delete this invoice? Payments will also be removed.');">
+                 Delete
+              </a>
             <?php endif; ?>
           </td>
         </tr>

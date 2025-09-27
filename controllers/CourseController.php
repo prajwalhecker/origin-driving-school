@@ -44,25 +44,57 @@ class CourseController extends Controller {
         $this->view("course/create");
     }
 
-    public function store() {
-        $this->requireRole('admin');
-        $name  = trim($_POST['name'] ?? '');
-        $desc  = trim($_POST['description'] ?? '');
-        $price = (float)($_POST['price'] ?? 0);
+   public function store() {
+    $this->requireRole('admin');
+    $name        = trim($_POST['name'] ?? '');
+    $desc        = trim($_POST['description'] ?? '');
+    $price       = (float)($_POST['price'] ?? 0);
+    $classCount  = (int)($_POST['class_count'] ?? 0);
 
-        if (!$name || $price <= 0) {
-            $this->flash('flash_error','Name and price required.');
-            return $this->view("course/create");
-        }
-
-        $stmt = $this->db->prepare(
-            "INSERT INTO courses (name, description, price, created_at) VALUES (?,?,?,NOW())"
-        );
-        $stmt->execute([$name, $desc, $price]);
-
-        $this->flash('flash_success','Course created successfully.');
-        $this->redirect('index.php?url=course/index');
+    if (!$name || $price <= 0 || $classCount <= 0) {
+        $this->flash('flash_error','Name, price and class count are required.');
+        return $this->view("course/create");
     }
+
+    $stmt = $this->db->prepare(
+        "INSERT INTO courses (name, description, price, class_count, created_at) 
+         VALUES (?,?,?,?,NOW())"
+    );
+    $stmt->execute([$name, $desc, $price, $classCount]);
+
+    $this->flash('flash_success','Course created successfully.');
+    $this->redirect('index.php?url=course/index');
+}
+
+public function update($id) {
+    $this->requireRole('admin');
+    $name        = trim($_POST['name'] ?? '');
+    $desc        = trim($_POST['description'] ?? '');
+    $price       = (float)($_POST['price'] ?? 0);
+    $classCount  = (int)($_POST['class_count'] ?? 0);
+
+    if (!$name || $price <= 0 || $classCount <= 0) {
+        $this->flash('flash_error','Name, price and class count are required.');
+        return $this->view("course/edit", [
+            'course' => [
+                'id'=>$id,
+                'name'=>$name,
+                'description'=>$desc,
+                'price'=>$price,
+                'class_count'=>$classCount
+            ]
+        ]);
+    }
+
+    $stmt = $this->db->prepare(
+        "UPDATE courses SET name=?, description=?, price=?, class_count=?, updated_at=NOW() WHERE id=?"
+    );
+    $stmt->execute([$name, $desc, $price, $classCount, $id]);
+
+    $this->flash('flash_success','Course updated successfully.');
+    $this->redirect('index.php?url=course/index');
+}
+
 
     public function edit($id) {
         $this->requireRole('admin');
@@ -78,23 +110,7 @@ class CourseController extends Controller {
         $this->view("course/edit", compact('course'));
     }
 
-    public function update($id) {
-        $this->requireRole('admin');
-        $name  = trim($_POST['name'] ?? '');
-        $desc  = trim($_POST['description'] ?? '');
-        $price = (float)($_POST['price'] ?? 0);
-
-        if (!$name || $price <= 0) {
-            $this->flash('flash_error','Name and price required.');
-            return $this->view("course/edit", ['course' => ['id'=>$id,'name'=>$name,'description'=>$desc,'price'=>$price]]);
-        }
-
-        $stmt = $this->db->prepare("UPDATE courses SET name=?, description=?, price=?, updated_at=NOW() WHERE id=?");
-        $stmt->execute([$name, $desc, $price, $id]);
-
-        $this->flash('flash_success','Course updated successfully.');
-        $this->redirect('index.php?url=course/index');
-    }
+    
 
     public function destroy($id) {
         $this->requireRole('admin');
