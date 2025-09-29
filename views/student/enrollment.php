@@ -92,15 +92,6 @@ $dayOptions = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
         <small class="muted">Used to set your invoice due date. Leave blank if you're unsure.</small>
       </div>
 
-      <div class="field">
-        <label for="vehicle_type">Vehicle type</label>
-        <select id="vehicle_type" name="vehicle_type">
-          <option value="">Keep current</option>
-          <option value="car" <?= $currentVehicle === 'car' ? 'selected' : ''; ?>>Car</option>
-          <option value="motorcycle" <?= $currentVehicle === 'motorcycle' ? 'selected' : ''; ?>>Motorcycle</option>
-        </select>
-      </div>
-    </div>
 
     <div class="grid-2">
       <div class="field">

@@ -2,4 +2,4 @@
 <p>Please contact the administrator at 
    <a href="mailto:clashprajwal@gmail.com">clashprajwal@gmail.com</a> 
    to reset your account.</p>
-<a href="/auth/login">Back to login</a>
+<a href="index.php?url=auth/login">Back to login</a>

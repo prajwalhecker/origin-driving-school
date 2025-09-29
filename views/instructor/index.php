@@ -7,13 +7,9 @@ $isAdmin = $currentRole === 'admin';
 
 if ($isAdmin) {
   $totalInstructors = count($instructors);
-  $withPhoto = 0;
   $experienceYears = [];
 
   foreach ($instructors as $row) {
-    if (!empty($row['photo'])) {
-      $withPhoto++;
-    }
     if (!empty($row['experience']) && preg_match('/([0-9]+(?:\.[0-9]+)?)/', (string)$row['experience'], $matches)) {
       $experienceYears[] = (float)$matches[1];
     }
@@ -59,11 +55,6 @@ if ($isAdmin) {
         <p class="muted mb-0">Currently listed in your directory</p>
       </div>
       <div class="card">
-        <h4 class="mb-1">Profile completion</h4>
-        <div style="font-size:1.6rem;font-weight:700; color:#0b6b33;"><?= $withPhoto; ?></div>
-        <p class="muted mb-0">Have uploaded profile photos</p>
-      </div>
-      <div class="card">
         <h4 class="mb-1">Average experience</h4>
         <div style="font-size:1.6rem;font-weight:700; color:#b54708;">
           <?= $avgExperience !== null ? number_format($avgExperience, 1) . ' yrs' : '—'; ?>
@@ -86,21 +77,6 @@ if ($isAdmin) {
       </div>
     </div>
 
-    <div class="card directory-toolbar mb-2">
-      <div class="search-group">
-        <label for="instructorSearch">Quick search</label>
-        <input id="instructorSearch" type="search" placeholder="Search by name, experience, or phone" autocomplete="off">
-      </div>
-      <div class="directory-toolbar__meta">
-        <div class="chip-group" role="group" aria-label="Profile filters">
-          <button type="button" class="chip active" data-photo-filter="all"><span class="dot"></span>All</button>
-          <button type="button" class="chip" data-photo-filter="with"><span class="dot"></span>With photo</button>
-          <button type="button" class="chip" data-photo-filter="without"><span class="dot"></span>Missing photo</button>
-        </div>
-        <small id="instructorResultCount">Showing <?= $totalInstructors; ?> instructor<?= $totalInstructors === 1 ? '' : 's'; ?></small>
-      </div>
-    </div>
-
     <div class="table-wrapper">
       <table class="table">
         <thead>
@@ -115,10 +91,10 @@ if ($isAdmin) {
         <tbody>
         <?php foreach ($instructors as $inst): ?>
           <?php
-            $photoFile = $inst['photo'] ?? 'default.png';
-            $hasPhoto = !empty($inst['photo']);
-            $photoPath = 'uploads/instructors/' . ($photoFile !== '' ? $photoFile : 'default.png');
+            $instructorId = (int)($inst['id'] ?? 0);
             $displayName = $inst['full_name'] ?? $inst['name'] ?? 'Unnamed';
+            $photoSrc = "assets/images/instructors/{$instructorId}.jpg";
+
             $searchIndex = strtolower(trim(implode(' ', array_filter([
               $displayName,
               $inst['experience'] ?? '',
@@ -130,12 +106,10 @@ if ($isAdmin) {
               $createdLabel = 'Added ' . date('d M Y', $time);
             }
           ?>
-          <tr data-instructor-row
-              data-photo="<?= $hasPhoto ? 'with' : 'without'; ?>"
-              data-search="<?= htmlspecialchars($searchIndex); ?>">
+          <tr data-instructor-row data-search="<?= htmlspecialchars($searchIndex); ?>">
             <td>
               <div class="stack">
-                <img class="avatar" src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($displayName); ?>">
+                <img class="avatar" src="<?= htmlspecialchars($photoSrc); ?>" alt="<?= htmlspecialchars($displayName); ?>">
                 <div class="stacked">
                   <strong><?= htmlspecialchars($displayName); ?></strong>
                   <?php if ($createdLabel): ?>
@@ -159,75 +133,10 @@ if ($isAdmin) {
             </td>
           </tr>
         <?php endforeach; ?>
-          <tr data-empty-row style="display:none;">
-            <td colspan="5" class="center muted">No instructors match your filters.</td>
-          </tr>
         </tbody>
       </table>
     </div>
-
-    <script>
-      (function(){
-        const searchInput = document.getElementById('instructorSearch');
-        const chips = Array.from(document.querySelectorAll('[data-photo-filter]'));
-        const rows = Array.from(document.querySelectorAll('[data-instructor-row]'));
-        const emptyRow = document.querySelector('[data-empty-row]');
-        const countLabel = document.getElementById('instructorResultCount');
-        const total = rows.length;
-        let activeFilter = 'all';
-
-        if (!rows.length) return;
-
-        const updateCount = (visible) => {
-          if (!countLabel) return;
-          const plural = visible === 1 ? '' : 's';
-          if (visible === total) {
-            countLabel.textContent = `Showing ${visible} instructor${plural}`;
-          } else {
-            countLabel.textContent = `Showing ${visible} of ${total} instructors`;
-          }
-        };
-
-        const applyFilters = () => {
-          const query = (searchInput?.value || '').trim().toLowerCase();
-          let visible = 0;
-
-          rows.forEach((row) => {
-            const photoState = row.dataset.photo || 'without';
-            const searchable = row.dataset.search || '';
-
-            const matchesPhoto = activeFilter === 'all' || photoState === activeFilter;
-            const matchesSearch = !query || searchable.includes(query);
-
-            if (matchesPhoto && matchesSearch) {
-              row.style.display = '';
-              visible++;
-            } else {
-              row.style.display = 'none';
-            }
-          });
-
-          if (emptyRow) {
-            emptyRow.style.display = visible ? 'none' : '';
-          }
-
-          updateCount(visible);
-        };
-
-        searchInput?.addEventListener('input', applyFilters);
-
-        chips.forEach((chip) => {
-          chip.addEventListener('click', () => {
-            activeFilter = chip.dataset.photoFilter || 'all';
-            chips.forEach((c) => c.classList.toggle('active', c === chip));
-            applyFilters();
-          });
-        });
-
-        applyFilters();
-      })();
-    </script>
-  <?php endif; ?> <!-- end $totalInstructors -->
+  <?php endif; ?>
 <?php else: ?>
   <!-- Public View -->
   <div class="mb-3">
@@ -244,18 +153,26 @@ if ($isAdmin) {
     <div class="cards instructor-grid">
       <?php foreach ($instructors as $inst): ?>
         <?php
-          $photoFile = $inst['photo'] ?? 'default.png';
-          $photoPath = 'assets/images/' . ($photoFile !== '' ? $photoFile : 'default.png');
-          $displayName = $inst['full_name'] ?? $inst['name'] ?? 'Instructor';
+          $instructorId = (int)($inst['id'] ?? 0);
+          $displayName  = $inst['full_name'] ?? $inst['name'] ?? 'Instructor';
+          $photoSrc     = "assets/images/instructors/{$instructorId}.jpg";
         ?>
         <div class="card instructor-card">
-          <img src="<?= htmlspecialchars($photoPath); ?>" alt="<?= htmlspecialchars($displayName); ?>" class="instructor-photo">
+          <img src="<?= htmlspecialchars($photoSrc); ?>" 
+               alt="<?= htmlspecialchars($displayName); ?>" 
+               class="mb-2 round" 
+               style="height:160px; width:100%; object-fit:cover;">
+
           <div class="name"><?= htmlspecialchars($displayName); ?></div>
           <?php if (!empty($inst['experience'])): ?>
             <div class="meta"><?= htmlspecialchars($inst['experience']); ?></div>
           <?php endif; ?>
           <?php if (!empty($inst['phone'])): ?>
-            <div class="meta">Call: <a href="tel:<?= htmlspecialchars(preg_replace('/[^0-9+]/', '', $inst['phone'])); ?>"><?= htmlspecialchars($inst['phone']); ?></a></div>
+            <div class="meta">
+              Call: <a href="tel:<?= htmlspecialchars(preg_replace('/[^0-9+]/', '', $inst['phone'])); ?>">
+                <?= htmlspecialchars($inst['phone']); ?>
+              </a>
+            </div>
           <?php endif; ?>
         </div>
       <?php endforeach; ?>

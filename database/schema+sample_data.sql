@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 25, 2025 at 10:21 AM
+-- Generation Time: Sep 29, 2025 at 03:53 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -71,7 +71,9 @@ CREATE TABLE `bookings` (
 INSERT INTO `bookings` (`id`, `student_id`, `instructor_id`, `course_id`, `branch_id`, `vehicle_id`, `start_time`, `end_time`, `status`, `reminder_sms_sent`, `created_at`, `updated_at`) VALUES
 (1, 5, 3, 1, 1, 1, '2025-02-10 09:00:00', '2025-02-10 11:00:00', 'completed', 0, '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (2, 6, 4, 2, 2, 2, '2025-03-05 14:00:00', '2025-03-05 16:00:00', 'booked', 0, '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(3, 7, 3, 3, 3, 3, '2025-04-01 10:00:00', '2025-04-01 12:00:00', 'cancelled', 0, '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+(3, 7, 3, 3, 3, 3, '2025-04-01 10:00:00', '2025-04-01 12:00:00', 'cancelled', 0, '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(4, 8, 11, 2, 4, 3, '2025-09-27 14:56:00', '2025-09-27 16:56:00', 'booked', 0, '2025-09-27 02:56:45', '2025-09-27 02:56:45'),
+(5, 8, 4, 1, 2, 2, '2025-10-12 13:42:00', '2025-10-12 19:42:00', 'booked', 0, '2025-09-28 03:42:20', '2025-09-28 03:42:20');
 
 -- --------------------------------------------------------
 
@@ -144,7 +146,7 @@ CREATE TABLE `courses` (
 --
 
 INSERT INTO `courses` (`id`, `name`, `title`, `description`, `price`, `fee`, `class_count`, `created_at`, `updated_at`) VALUES
-(1, 'Basic Driving', 'Basic Driving', 'Introduction to car driving basics.', 800.00, 800.00, 8, '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(1, 'Basic Driving', 'Basic Driving', 'Introduction to car driving basics.', 800.00, 800.00, 8, '2025-09-25 07:13:42', '2025-09-27 03:35:35'),
 (2, 'Advanced Driving', 'Advanced Driving', 'Advanced maneuvers and highway driving.', 1400.00, 1400.00, 12, '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (3, 'Motorcycle Riding', 'Motorcycle Riding', 'Motorcycle operation and safety essentials.', 1000.00, 1000.00, 6, '2025-09-25 07:13:42', '2025-09-25 07:13:42');
 
@@ -219,7 +221,9 @@ CREATE TABLE `instructors` (
 
 INSERT INTO `instructors` (`id`, `user_id`, `name`, `experience`, `address`, `phone`, `photo`, `availability`, `created_at`, `updated_at`) VALUES
 (1, 3, 'Bikash Rai', '10 years teaching experience', '5 Barrack St, Sydney', '0434567890', NULL, '[\"Mon\", \"Wed\", \"Fri\"]', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(2, 4, 'Manoj Gurung', 'Defensive driving specialist', '45 George St, Manly', '0445678901', NULL, '[\"Tue\", \"Thu\", \"Sat\"]', '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+(2, 4, 'Manoj Gurung', 'Defensive driving specialist', '45 George St, Manly', '0445678901', NULL, '[\"Tue\", \"Thu\", \"Sat\"]', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(4, 11, 'Ramesh Khanal', '', '', '0492930202', NULL, NULL, '2025-09-27 02:48:47', '2025-09-27 02:48:47'),
+(5, 12, 'Shyam Karki', '', '', '0492294042', NULL, NULL, '2025-09-27 02:53:14', '2025-09-27 02:53:14');
 
 -- --------------------------------------------------------
 
@@ -234,6 +238,7 @@ CREATE TABLE `invoices` (
   `amount` decimal(10,2) NOT NULL,
   `issued_date` date NOT NULL,
   `due_date` date NOT NULL,
+  `paid_on` datetime DEFAULT NULL,
   `status` enum('unpaid','pending','partial','paid','overdue') NOT NULL DEFAULT 'unpaid',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -243,10 +248,14 @@ CREATE TABLE `invoices` (
 -- Dumping data for table `invoices`
 --
 
-INSERT INTO `invoices` (`id`, `student_id`, `course_id`, `amount`, `issued_date`, `due_date`, `status`, `created_at`, `updated_at`) VALUES
-(1, 5, 1, 800.00, '2025-01-28', '2025-02-15', 'paid', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(2, 6, 2, 1400.00, '2025-02-20', '2025-03-10', 'unpaid', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(3, 7, 3, 1000.00, '2025-03-01', '2025-03-20', 'overdue', '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+INSERT INTO `invoices` (`id`, `student_id`, `course_id`, `amount`, `issued_date`, `due_date`, `paid_on`, `status`, `created_at`, `updated_at`) VALUES
+(1, 5, 1, 800.00, '2025-01-28', '2025-02-15', NULL, 'paid', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(2, 6, 2, 1400.00, '2025-02-20', '2025-03-10', NULL, 'unpaid', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(3, 7, 3, 1000.00, '2025-03-01', '2025-03-20', NULL, 'overdue', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(4, 8, 1, 1400.00, '0000-00-00', '2025-10-09', NULL, 'pending', '2025-09-25 11:39:52', '2025-09-25 11:39:52'),
+(5, 8, 1, 800.00, '2025-09-25', '2026-03-26', NULL, 'pending', '2025-09-25 12:26:19', '2025-09-25 12:26:19'),
+(6, 9, 1, 800.00, '2025-09-25', '2026-04-25', NULL, 'pending', '2025-09-25 13:01:36', '2025-09-25 13:01:36'),
+(7, 8, 2, 1400.00, '2025-09-26', '2025-10-01', '2025-09-27 13:23:31', 'paid', '2025-09-26 03:54:19', '2025-09-27 03:23:31');
 
 -- --------------------------------------------------------
 
@@ -271,7 +280,8 @@ CREATE TABLE `job_applications` (
 --
 
 INSERT INTO `job_applications` (`id`, `name`, `email`, `phone`, `license_no`, `experience_years`, `resume_path`, `status`, `created_at`) VALUES
-(1, 'Ashraya Acharya', 'ashraya@example.com', '0412345678', 'NSW-998877', 6, 'uploads/resumes/ashraya.pdf', 'pending', '2025-09-25 07:13:42');
+(1, 'Ashraya Acharya', 'ashraya@example.com', '0412345678', 'NSW-998877', 6, 'uploads/resumes/ashraya.pdf', 'pending', '2025-09-25 07:13:42'),
+(2, 'Prajwal Khadka', 'clashprajwal@gmail.com', '0422774077', '79044-554', 3, NULL, 'pending', '2025-09-29 12:30:01');
 
 -- --------------------------------------------------------
 
@@ -294,7 +304,7 @@ CREATE TABLE `messages` (
 --
 
 INSERT INTO `messages` (`id`, `sender_id`, `receiver_id`, `subject`, `content`, `channel`, `sent_at`) VALUES
-(1, 2, 5, 'Welcome to Origin Driving School', 'Dear Puja, welcome aboard!', 'in_app', '2025-01-01 09:00:00'),
+(1, NULL, 5, 'Welcome to Origin Driving School', 'Dear Puja, welcome aboard!', 'in_app', '2025-01-01 09:00:00'),
 (2, 3, 6, 'Lesson Update', 'Your lesson on 2025-03-05 has been booked.', 'email', '2025-02-20 15:30:00');
 
 -- --------------------------------------------------------
@@ -317,7 +327,7 @@ CREATE TABLE `notes` (
 --
 
 INSERT INTO `notes` (`id`, `entity_type`, `entity_id`, `author_id`, `content`, `created_at`) VALUES
-(1, 'student', 5, 2, 'Puja shows good control at low speeds.', '2025-02-10 00:15:00');
+(1, 'student', 5, NULL, 'Puja shows good control at low speeds.', '2025-02-10 00:15:00');
 
 -- --------------------------------------------------------
 
@@ -443,7 +453,9 @@ CREATE TABLE `student_profiles` (
 INSERT INTO `student_profiles` (`id`, `user_id`, `vehicle_type`, `course_id`, `branch_id`, `address`, `phone`, `preferred_days`, `preferred_time`, `start_date`, `created_at`, `updated_at`) VALUES
 (1, 5, 'car', 1, 1, '16 King St, Sydney NSW', '0467890123', 'Mon,Wed,Fri', 'Morning', '2025-02-01', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (2, 6, 'car', 2, 2, '45 Church St, Parramatta NSW', '0478901234', 'Tue,Thu', 'Afternoon', '2025-03-05', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(3, 7, 'motorcycle', 3, 3, '12 The Corso, Manly NSW', '0456789012', 'Sat,Sun', 'Morning', '2025-03-15', '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+(3, 7, 'motorcycle', 3, 3, '12 The Corso, Manly NSW', '0456789012', 'Sat,Sun', 'Morning', '2025-03-15', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(4, 8, 'car', 2, 3, 'Toilet', '0492838202', 'Mon,Wed,Sun', 'Morning', '2025-10-01', '2025-09-25 09:25:21', '2025-09-26 03:54:19'),
+(5, 9, 'car', 1, 4, NULL, NULL, 'Mon,Thu,Sat', 'Morning', '2026-04-25', '2025-09-25 13:01:36', '2025-09-25 13:01:36');
 
 -- --------------------------------------------------------
 
@@ -470,12 +482,15 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`id`, `branch_id`, `first_name`, `last_name`, `email`, `password`, `phone`, `role`, `created_at`, `updated_at`) VALUES
 (1, 1, 'Prajwal', 'Khadka', 'admin@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0299991111', 'admin', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(2, 2, 'Sita', 'Shrestha', 'sita.staff@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0299992222', 'staff', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (3, 1, 'Bikash', 'Rai', 'bikash.rai@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0434567890', 'instructor', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (4, 3, 'Manoj', 'Gurung', 'manoj.gurung@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0445678901', 'instructor', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (5, 1, 'Puja', 'Rana', 'puja.rana@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0467890123', 'student', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (6, 2, 'Sanjay', 'Magar', 'sanjay.magar@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0478901234', 'student', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(7, 3, 'Kiran', 'Adhikari', 'kiran.adhikari@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0456789012', 'student', '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+(7, 3, 'Kiran', 'Adhikari', 'kiran.adhikari@origin.test', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0456789012', 'student', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(8, 3, 'Randy', 'Rimal', 'imrandy@gmail.com', '$2y$10$YqsQBPMvz9i0aenpTZKSeu8pYFIU0KaX.9FBljsdZerhCCS/zVvxy', '0492838202', 'student', '2025-09-25 09:25:21', '2025-09-26 03:54:19'),
+(9, 4, 'Sam', 'Altman', 'altman@gmail.com', '$2y$10$13RptJeW64XhlM.S4e9RC.TCeQqfg4uDOvD.KjTwjK2zlbWEJCV9e', '0492839328', 'student', '2025-09-25 12:58:56', '2025-09-25 13:01:36'),
+(11, NULL, 'Ramesh', 'Khanal', 'khanalramesh@gmail.com', '', '0492930202', 'instructor', '2025-09-27 02:48:47', '2025-09-27 02:48:47'),
+(12, NULL, 'Shyam', 'Karki', 'shyamkarki@gmail.com', '', '0492294042', 'instructor', '2025-09-27 02:53:14', '2025-09-27 02:53:14');
 
 -- --------------------------------------------------------
 
@@ -502,7 +517,8 @@ CREATE TABLE `vehicles` (
 INSERT INTO `vehicles` (`id`, `branch_id`, `registration_number`, `make`, `model`, `status`, `last_maintenance`, `created_at`, `updated_at`) VALUES
 (1, 1, 'SYD-1234', 'Toyota', 'Corolla', 'available', '2025-06-01', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
 (2, 2, 'PAR-5678', 'Hyundai', 'Accent', 'maintenance', '2025-05-15', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
-(3, 3, 'MAN-9101', 'Suzuki', 'Swift', 'available', '2025-07-20', '2025-09-25 07:13:42', '2025-09-25 07:13:42');
+(3, 3, 'MAN-9101', 'Suzuki', 'Swift', 'available', '2025-07-20', '2025-09-25 07:13:42', '2025-09-25 07:13:42'),
+(4, 4, 'K2302', '2019', 'Tesla X', 'available', '2025-09-27', '2025-09-27 03:02:03', '2025-09-27 03:02:03');
 
 --
 -- Indexes for dumped tables
@@ -665,13 +681,13 @@ ALTER TABLE `attachments`
 -- AUTO_INCREMENT for table `bookings`
 --
 ALTER TABLE `bookings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `branch_tours`
@@ -683,7 +699,7 @@ ALTER TABLE `branch_tours`
 -- AUTO_INCREMENT for table `courses`
 --
 ALTER TABLE `courses`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `course_instructors`
@@ -701,19 +717,19 @@ ALTER TABLE `fleet`
 -- AUTO_INCREMENT for table `instructors`
 --
 ALTER TABLE `instructors`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `invoices`
 --
 ALTER TABLE `invoices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `job_applications`
 --
 ALTER TABLE `job_applications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -755,19 +771,19 @@ ALTER TABLE `students`
 -- AUTO_INCREMENT for table `student_profiles`
 --
 ALTER TABLE `student_profiles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `vehicles`
 --
 ALTER TABLE `vehicles`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Constraints for dumped tables

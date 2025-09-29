@@ -69,7 +69,15 @@ class AuthController extends Controller {
       'flash_success' => $this->takeFlash('flash_success')
     ]);
   }
-
+ /**
+   * Forgot password page
+   */
+  public function forgot() {
+    $this->view("auth/forgot", [
+      'flash_error'   => $this->takeFlash('flash_error'),
+      'flash_success' => $this->takeFlash('flash_success')
+    ]);
+  }
   /**
    * Register
    */
