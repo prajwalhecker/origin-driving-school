@@ -9,6 +9,21 @@ function e($value): string {                 // Escape for HTML
   return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+function asset_url(string $path): string {
+  $normalized = ltrim($path, '/');
+  $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+  $scriptDir = str_replace('\\', '/', dirname($scriptName));
+
+  if ($scriptDir === '/' || $scriptDir === '\\' || $scriptDir === '.') {
+    $scriptDir = '';
+  }
+
+  $base = rtrim($scriptDir, '/');
+  $prefix = $base === '' ? '/assets/' : $base . '/assets/';
+
+  return $prefix . $normalized;
+}
+
 function clean($value): string {             // Trim + strip tags (for plain inputs)
   return trim(strip_tags((string)$value));
 }
