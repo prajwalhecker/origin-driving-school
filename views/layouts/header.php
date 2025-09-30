@@ -20,53 +20,96 @@
     })();
   </script>
   <?php $mainCss = asset_url('css/main.css'); ?>
-  <link rel="stylesheet" href="<?= e($mainCss) ?>" /
+  <link rel="stylesheet" href="<?= e($mainCss) ?>" />
 </head>
 <body>
 <div class="topbar">
   <div class="inner">
     <div class="brand">
-      <a href="index.php?url=dashboard/index">Origin Driving School</a>
+      <a href="index.php?url=dashboard/index" class="logo-link">
+  <a href="index.php?url=dashboard/index" class="logo-link">
+  <div class="logo-wrapper">
+    <img src="assets/images/logo.png" alt="Origin Driving School" id="siteLogo">
+  </div>
+</a>
+
+<style>
+  .logo-wrapper {
+    height: 50px;
+    width: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .logo-wrapper img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    display: block;
+  }
+</style>
+
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const logo = document.getElementById("siteLogo");
+    if (logo) {
+      logo.style.maxHeight = "50px";  
+      logo.style.width = "auto";       
+      logo.style.objectFit = "contain";
+    }
+  });
+</script>
+
     </div>
     <div class="nav">
-  <?php if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'instructor')): ?>
-    <a href="index.php?url=student/index">Students</a>
+      <?php if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'instructor')): ?>
+        <a href="index.php?url=student/index">Students</a>
+      <?php endif; ?>
+
+      <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'student'): ?>
+        <a href="index.php?url=student/profile">My Profile</a>
+      <?php endif; ?>
+
+      <?php if (!isset($_SESSION['role']) || $_SESSION['role'] === 'admin' || $_SESSION['role'] === 'student'): ?>
+    <a href="index.php?url=instructor/index">Instructors</a>
   <?php endif; ?>
 
-  <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'student'): ?>
-    <a href="index.php?url=student/profile">My Profile</a>
-  <?php endif; ?>
+      <?php if (!empty($_SESSION['user_id'])): ?>
+        <a href="index.php?url=schedule/index">Schedule</a>
+        <?php if (($_SESSION['role'] ?? '') === 'admin' || ($_SESSION['role'] ?? '') === 'student'): ?>
+          <a href="index.php?url=invoice/index">Invoices</a>
+        <?php endif; ?>
+      <?php endif; ?>
 
-  <a href="index.php?url=instructor/index">Instructors</a>
+      <a href="index.php?url=fleet/index">Fleet</a>
+      <a href="index.php?url=branch/index">Branches</a>
+      <a href="index.php?url=course/index">Courses</a>
 
-  <?php if (!empty($_SESSION['user_id'])): ?>
-    <!-- only show these if logged in -->
-    <a href="index.php?url=schedule/index">Schedule</a>
-    <a href="index.php?url=invoice/index">Invoices</a>
-  <?php endif; ?>
+      <?php if (!empty($_SESSION['user_id'])): ?>
+        <!-- User dropdown -->
+        <div class="user-dropdown">
+          <button class="user-btn">
+            <?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?> ▼
+          </button>
+          <div class="user-menu">
+            <a href="index.php?url=auth/logout">Logout</a>
+          </div>
+        </div>
+      <?php else: ?>
+        <a href="index.php?url=auth/login">Login</a>
+        <a href="index.php?url=auth/register">Learn With Us</a>
+      <?php endif; ?>
 
-  <a href="index.php?url=fleet/index">Fleet</a>
-  <a href="index.php?url=branch/index">Branches</a>
-  <a href="index.php?url=course/index">Courses</a>
-
-  <?php if (!empty($_SESSION['user_id'])): ?>
-    <span class="nav-meta">Role: <?= htmlspecialchars($_SESSION['role'] ?? '') ?></span>
-    <?php if (($_SESSION['role'] ?? '') === 'student' && !empty($_SESSION['branch_name'])): ?>
-      <span class="badge badge-accent">Branch: <?= htmlspecialchars($_SESSION['branch_name']); ?></span>
-    <?php endif; ?>
-    <a href="index.php?url=auth/logout">Logout</a>
-  <?php else: ?>
-    <a href="index.php?url=auth/login">Login</a>
-    <a href="index.php?url=auth/register">Learn With Us</a>
-  <?php endif; ?>
-
-  <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark mode" title="Toggle dark mode">
-    <span class="sr-only"></span>
-    <span class="icon icon-sun" aria-hidden="true">☀️</span>
-    <span class="icon icon-moon" aria-hidden="true">🌙</span>
-  </button>
-</div>
-
+      <!-- Dark mode toggle (unchanged) -->
+      <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark mode" title="Toggle dark mode">
+        <span class="sr-only"></span>
+        <span class="icon icon-sun" aria-hidden="true">☀️</span>
+        <span class="icon icon-moon" aria-hidden="true">🌙</span>
+      </button>
+    </div>
   </div>
 </div>
 

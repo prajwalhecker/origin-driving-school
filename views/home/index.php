@@ -39,11 +39,11 @@
     <p class="stat-label">Graduated Drivers</p>
   </div>
   <div>
-    <span class="stat-number">24</span>
+    <span class="stat-number">12</span>
     <p class="stat-label">Expert Instructors</p>
   </div>
   <div>
-    <span class="stat-number">8</span>
+    <span class="stat-number">4</span>
     <p class="stat-label">Connected Branches</p>
   </div>
   <div>

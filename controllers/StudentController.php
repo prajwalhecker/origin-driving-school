@@ -4,33 +4,68 @@ class StudentController extends Controller {
   // ============================
   // LIST & PROFILE
   // ============================
+  public function index() {
+  @session_start();
 
-  public function index(){ // admin only: list students
-    $this->requireRole('admin');
+  $role = $_SESSION['role'] ?? '';
+  $search = trim($_GET['q'] ?? '');
+  $branchFilter = $_GET['branch'] ?? 'all';
 
-    $search = trim($_GET['q'] ?? '');
-    $branchFilter = $_GET['branch'] ?? 'all';
+  // ============================
+  // INSTRUCTOR VIEW
+  // ============================
+  if ($role === 'instructor') {
+    $instructorId = (int)($_SESSION['user_id'] ?? 0);
+    if ($instructorId <= 0) {
+      $this->flash('flash_error', 'Unable to load your learners.');
+      $this->redirect('index.php?url=dashboard/index');
+    }
 
-    $sql = "SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.created_at, b.name AS branch_name
-            FROM users u
-            LEFT JOIN branches b ON u.branch_id = b.id
-            WHERE u.role='student'";
-    $params = [];
+    $sql = "SELECT
+              stu.id,
+              MAX(stu.first_name) AS first_name,
+              MAX(stu.last_name) AS last_name,
+              MAX(stu.email) AS email,
+              MAX(COALESCE(NULLIF(sp.phone, ''), NULLIF(stu.phone, ''), '')) AS phone,
+              MAX(stu.created_at) AS created_at,
+              MAX(COALESCE(sp.branch_id, stu.branch_id)) AS branch_id,
+              MAX(COALESCE(pb.name, ub.name, 'Unassigned')) AS branch_name,
+              MAX(CASE WHEN sp.user_id IS NULL THEN 0 ELSE 1 END) AS has_profile,
+              MIN(CASE WHEN b.start_time >= NOW() THEN b.start_time END) AS next_lesson_at,
+              SUM(CASE WHEN b.start_time >= NOW() AND b.status <> 'cancelled' THEN 1 ELSE 0 END) AS upcoming_lessons,
+              SUM(CASE WHEN b.status = 'completed' THEN 1 ELSE 0 END) AS completed_lessons
+            FROM bookings b
+            INNER JOIN users stu ON stu.id = b.student_id
+            LEFT JOIN student_profiles sp ON sp.user_id = stu.id
+            LEFT JOIN branches ub ON ub.id = stu.branch_id
+            LEFT JOIN branches pb ON pb.id = sp.branch_id
+            WHERE b.instructor_id = ?
+              AND stu.role = 'student'";
+
+    $params = [$instructorId];
 
     if ($branchFilter !== 'all' && $branchFilter !== '') {
-      $sql .= " AND u.branch_id = ?";
+      $sql .= " AND COALESCE(sp.branch_id, stu.branch_id) = ?";
       $params[] = (int)$branchFilter;
     }
 
     if ($search !== '') {
-      $sql .= " AND (CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)";
+      $sql .= " AND (CONCAT(stu.first_name, ' ', stu.last_name) LIKE ?"
+            . " OR stu.email LIKE ?"
+            . " OR COALESCE(NULLIF(sp.phone, ''), NULLIF(stu.phone, '')) LIKE ?)";
       $like = "%$search%";
       $params[] = $like;
       $params[] = $like;
       $params[] = $like;
     }
 
-    $sql .= " ORDER BY u.created_at DESC";
+    // ✅ FIXED ORDER BY (no alias in ORDER BY)
+    $sql .= " GROUP BY stu.id
+              ORDER BY 
+                (MIN(CASE WHEN b.start_time >= NOW() THEN b.start_time END) IS NULL),
+                MIN(CASE WHEN b.start_time >= NOW() THEN b.start_time END),
+                last_name,
+                first_name";
 
     $stmt = $this->db->prepare($sql);
     $stmt->execute($params);
@@ -39,16 +74,35 @@ class StudentController extends Controller {
     $branchStmt = $this->db->query("SELECT id, name FROM branches ORDER BY name");
     $branches = $branchStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $totalStudents = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
-    $recentStudents = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn();
-    $profileCount = (int)$this->db->query("SELECT COUNT(*) FROM student_profiles")->fetchColumn();
-    $contactable = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student' AND phone IS NOT NULL AND phone <> ''")->fetchColumn();
+    // summary counts
+    $totalStudents  = count($students);
+    $recentCutoff   = (new DateTimeImmutable('-30 days'))->format('Y-m-d H:i:s');
+    $recentStudents = 0;
+    $profileCount   = 0;
+    $contactable    = 0;
+    $upcomingTotal  = 0;
+
+    foreach ($students as &$student) {
+      $createdAt = $student['created_at'] ?? null;
+      if ($createdAt && $createdAt >= $recentCutoff) {
+        $recentStudents++;
+      }
+      if (!empty($student['has_profile'])) {
+        $profileCount++;
+      }
+      if (!empty($student['phone'])) {
+        $contactable++;
+      }
+      $upcomingTotal += (int)($student['upcoming_lessons'] ?? 0);
+    }
+    unset($student);
 
     $summary = [
       'total'       => $totalStudents,
       'recent'      => $recentStudents,
       'profiles'    => $profileCount,
       'contactable' => $contactable,
+      'upcoming'    => $upcomingTotal,
     ];
 
     $filters = [
@@ -56,8 +110,73 @@ class StudentController extends Controller {
       'branch' => $branchFilter,
     ];
 
-    $this->view("student/index", compact('students', 'branches', 'summary', 'filters'));
+    $this->view('student/index', [
+      'students'         => $students,
+      'branches'         => $branches,
+      'summary'          => $summary,
+      'filters'          => $filters,
+      'isInstructorView' => true,
+    ]);
+    return;
   }
+
+  // ============================
+  // ADMIN / STAFF VIEW (unchanged)
+  // ============================
+  $sql = "SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.created_at, b.name AS branch_name
+          FROM users u
+          LEFT JOIN branches b ON u.branch_id = b.id
+          WHERE u.role='student'";
+  $params = [];
+
+  if ($branchFilter !== 'all' && $branchFilter !== '') {
+    $sql .= " AND u.branch_id = ?";
+    $params[] = (int)$branchFilter;
+  }
+
+  if ($search !== '') {
+    $sql .= " AND (CONCAT(u.first_name, ' ', u.last_name) LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)";
+    $like = "%$search%";
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+  }
+
+  $sql .= " ORDER BY u.created_at DESC";
+
+  $stmt = $this->db->prepare($sql);
+  $stmt->execute($params);
+  $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $branchStmt = $this->db->query("SELECT id, name FROM branches ORDER BY name");
+  $branches = $branchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $totalStudents = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
+  $recentStudents = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn();
+  $profileCount = (int)$this->db->query("SELECT COUNT(*) FROM student_profiles")->fetchColumn();
+  $contactable = (int)$this->db->query("SELECT COUNT(*) FROM users WHERE role='student' AND phone IS NOT NULL AND phone <> ''")->fetchColumn();
+
+  $summary = [
+    'total'       => $totalStudents,
+    'recent'      => $recentStudents,
+    'profiles'    => $profileCount,
+    'contactable' => $contactable,
+  ];
+
+  $filters = [
+    'q'      => $search,
+    'branch' => $branchFilter,
+  ];
+
+  $this->view('student/index', [
+    'students'         => $students,
+    'branches'         => $branches,
+    'summary'          => $summary,
+    'filters'          => $filters,
+    'isInstructorView' => false,
+  ]);
+}
+
  public function enrollment() {
     $this->requireRole('student');
 

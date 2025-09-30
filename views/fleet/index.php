@@ -70,22 +70,6 @@ if ($isAdmin || $isInstructor) {
       </div>
     </div>
 
-    <div class="card page-toolbar mb-2">
-      <div class="search-group">
-        <label for="fleetSearch">Quick search</label>
-        <input id="fleetSearch" type="search" placeholder="Search by make, model, branch, or reg" autocomplete="off">
-      </div>
-      <div class="page-toolbar__meta">
-        <div class="chip-group" role="group" aria-label="Status filters">
-          <button type="button" class="chip active" data-status-filter="all"><span class="dot"></span>All</button>
-          <button type="button" class="chip" data-status-filter="available"><span class="dot"></span>Available</button>
-          <button type="button" class="chip" data-status-filter="assigned"><span class="dot"></span>Assigned</button>
-          <button type="button" class="chip" data-status-filter="maintenance"><span class="dot"></span>Maintenance</button>
-        </div>
-        <small id="fleetResultCount">Showing <?= $totalVehicles; ?> vehicle<?= $totalVehicles === 1 ? '' : 's'; ?></small>
-      </div>
-    </div>
-
     <div class="table-wrapper">
       <table class="table">
         <thead>
@@ -130,6 +114,10 @@ if ($isAdmin || $isInstructor) {
               data-search="<?= htmlspecialchars($searchable); ?>">
             <td>
               <div class="stack">
+                <!-- 🚗 Fleet image -->
+                <img src="assets/images/fleets/<?= (int)$car['id']; ?>.jpg"
+                     alt="<?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?>"
+                     style="width:80px; height:50px; object-fit:cover; border-radius:6px; margin-right:8px;">
                 <div class="stacked">
                   <strong><?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?></strong>
                   <span class="muted text-sm">Reg <?= htmlspecialchars($car['registration_number'] ?? '—'); ?></span>
@@ -151,70 +139,6 @@ if ($isAdmin || $isInstructor) {
         </tbody>
       </table>
     </div>
-
-    <script>
-      (function(){
-        const searchInput = document.getElementById('fleetSearch');
-        const chips = Array.from(document.querySelectorAll('[data-status-filter]'));
-        const rows = Array.from(document.querySelectorAll('[data-fleet-row]'));
-        const emptyRow = document.querySelector('[data-empty-row]');
-        const countLabel = document.getElementById('fleetResultCount');
-        const total = rows.length;
-        let statusFilter = 'all';
-
-        if (!rows.length) {
-          return;
-        }
-
-        const updateCount = (visible) => {
-          if (!countLabel) return;
-          const plural = visible === 1 ? '' : 's';
-          if (visible === total) {
-            countLabel.textContent = `Showing ${visible} vehicle${plural}`;
-          } else {
-            countLabel.textContent = `Showing ${visible} of ${total} vehicles`;
-          }
-        };
-
-        const applyFilters = () => {
-          const query = (searchInput?.value || '').trim().toLowerCase();
-          let visible = 0;
-
-          rows.forEach((row) => {
-            const status = row.dataset.status || 'available';
-            const searchable = row.dataset.search || '';
-
-            const matchesStatus = statusFilter === 'all' || status === statusFilter;
-            const matchesSearch = !query || searchable.includes(query);
-
-            if (matchesStatus && matchesSearch) {
-              row.style.display = '';
-              visible++;
-            } else {
-              row.style.display = 'none';
-            }
-          });
-
-          if (emptyRow) {
-            emptyRow.style.display = visible ? 'none' : '';
-          }
-
-          updateCount(visible);
-        };
-
-        searchInput?.addEventListener('input', applyFilters);
-
-        chips.forEach((chip) => {
-          chip.addEventListener('click', () => {
-            statusFilter = chip.dataset.statusFilter || 'all';
-            chips.forEach((c) => c.classList.toggle('active', c === chip));
-            applyFilters();
-          });
-        });
-
-        applyFilters();
-      })();
-    </script>
   <?php endif; ?>
 <?php elseif ($isInstructor): ?>
   <div class="mb-3">
@@ -246,15 +170,6 @@ if ($isAdmin || $isInstructor) {
       </div>
     </div>
 
-    <div class="card role-callout mb-2">
-      <h2 class="mb-1">Teaching best practices</h2>
-      <ul class="muted">
-        <li>Attach lesson notes and vehicle condition photos after each drive.</li>
-        <li>Use the shared calendar to avoid double-booking popular time slots.</li>
-        <li>Trigger SMS reminders to students for early-morning sessions.</li>
-      </ul>
-    </div>
-
     <div class="cards instructor-fleet">
       <?php foreach ($fleet as $car): ?>
         <?php
@@ -277,6 +192,11 @@ if ($isAdmin || $isInstructor) {
           }
         ?>
         <div class="card">
+          <!-- 🚗 Fleet image -->
+          <img src="assets/images/fleets/<?= (int)$car['id']; ?>.jpg"
+               alt="<?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?>"
+               class="mb-2 round"
+               style="height:160px; width:100%; object-fit:cover;">
           <div class="stack" style="justify-content:space-between; align-items:flex-start; gap:12px;">
             <div>
               <h3 class="mb-1"><?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?></h3>
@@ -309,6 +229,11 @@ if ($isAdmin || $isInstructor) {
     <div class="cards">
       <?php foreach ($fleet as $car): ?>
         <div class="card">
+          <!-- 🚗 Fleet image -->
+          <img src="assets/images/fleets/<?= (int)$car['id']; ?>.jpg"
+               alt="<?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?>"
+               class="mb-2 round"
+               style="height:160px; width:100%; object-fit:cover;">
           <h3 class="mb-1"><?= htmlspecialchars(trim(($car['make'] ?? '') . ' ' . ($car['model'] ?? '')) ?: 'Vehicle'); ?></h3>
           <p class="muted mb-1">Registration <?= htmlspecialchars($car['registration_number'] ?? '—'); ?></p>
           <p class="muted mb-1">Based at <?= htmlspecialchars($car['branch_name'] ?? 'our central garage'); ?></p>
